@@ -1,0 +1,10 @@
+apple:苹果
+book:书
+computer:电脑
+desk:桌子
+elephant:大象
+fish:鱼
+giraffe:长颈鹿
+house:房子
+ice:冰
+juice:果汁

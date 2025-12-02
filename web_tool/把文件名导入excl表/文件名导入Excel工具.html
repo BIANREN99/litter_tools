@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件名导入Excel工具（终极版）</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- SheetJS (xlsx.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- FileSaver.js -->
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <!-- SortableJS - 用于拖拽排序 -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a56db',
+                        secondary: '#e2e8f0',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        info: '#3b82f6',
+                        light: '#f8fafc',
+                        dark: '#1e293b'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    },
+                    boxShadow: {
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        'drag': '0 4px 12px rgba(0, 0, 0, 0.15)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .transition-all {
+                transition-property: all;
+                transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+                transition-duration: 150ms;
+            }
+            .scrollbar-thin {
+                scrollbar-width: thin;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .bg-gradient {
+                background: linear-gradient(135deg, #1a56db 0%, #3b82f6 100%);
+            }
+            .drag-handle {
+                cursor: grab;
+                transition: all 0.2s ease;
+            }
+            .drag-handle:active {
+                cursor: grabbing;
+            }
+            .drag-handle:hover {
+                color: #1a56db;
+            }
+            .sortable-ghost {
+                background-color: rgba(26, 86, 219, 0.1);
+                border-radius: 0.375rem;
+                opacity: 0.7;
+            }
+            .sortable-chosen {
+                background-color: rgba(26, 86, 219, 0.15);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
+        }
+    </style>
+    <style>
+        /* 自定义样式 */
+        .folder-drop-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .folder-drop-area.active {
+            border-color: #1a56db;
+            background-color: rgba(26, 86, 219, 0.05);
+        }
+        .progress-bar {
+            height: 8px;
+            background-color: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #1a56db;
+            transition: width 0.3s ease;
+        }
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background-color: #f8fafc;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        tr:hover {
+            background-color: #f1f5f9;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            font-weight: 500;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease;
+        }
+        .btn-primary {
+            background-color: #1a56db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #1e429f;
+        }
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #1e293b;
+        }
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        .btn-icon {
+            margin-right: 0.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        .form-control {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            transition: border-color 0.2s ease;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #1a56db;
+            box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.1);
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border-radius: 9999px;
+        }
+        .badge-primary {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .badge-success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .badge-warning {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .alert {
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+        }
+        .alert-success {
+            background-color: #dcfce7;
+            color: #166534;
+            border-left: 4px solid #10b981;
+        }
+        .alert-error {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+        .alert-info {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .excel-upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            margin-bottom: 1rem;
+        }
+        .excel-upload-area.active {
+            border-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.05);
+        }
+        .checkbox-wrapper {
+            display: inline-block;
+            position: relative;
+        }
+        .checkbox-wrapper input[type="checkbox"] {
+            opacity: 0;
+            position: absolute;
+            width: 0;
+            height: 0;
+        }
+        .checkbox-wrapper label {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 1px solid #cbd5e1;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .checkbox-wrapper input[type="checkbox"]:checked + label {
+            background-color: #1a56db;
+            border-color: #1a56db;
+        }
+        .checkbox-wrapper input[type="checkbox"]:checked + label:after {
+            content: "✓";
+            color: white;
+            font-size: 12px;
+            text-align: center;
+            display: block;
+        }
+        .selected-row {
+            background-color: rgba(26, 86, 219, 0.05);
+        }
+        /* 拖拽排序相关样式 */
+        .drag-placeholder {
+            height: 56px;
+            background-color: rgba(26, 86, 219, 0.08);
+            border-radius: 0.375rem;
+            margin: 0;
+        }
+        tr.sortable-ghost {
+            opacity: 0.5;
+            background-color: rgba(26, 86, 219, 0.1);
+        }
+        tr.sortable-chosen {
+            background-color: rgba(26, 86, 219, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 0.375rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- 头部 -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-primary mb-2">文件名导入Excel工具（终极版）</h1>
+            <p class="text-gray-600">支持文件/文件夹选择、批量删除、拖拽排序、指定行列插入Excel</p>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左侧控制面板 -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-card p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-cogs text-primary mr-2"></i>操作面板
+                    </h2>
+                    
+                    <!-- 文件/文件夹选择 -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium mb-3">选择文件/文件夹</h3>
+                        
+                        <!-- 文件夹选择 -->
+                        <div class="folder-drop-area mb-4">
+                            <i class="fa fa-folder-open text-4xl text-gray-400 mb-2"></i>
+                            <p class="mb-2">拖拽文件夹到此处</p>
+                            <button id="selectFolderBtn" class="btn btn-primary">
+                                <i class="fa fa-folder text-sm btn-icon"></i>选择文件夹
+                            </button>
+                        </div>
+                        
+                        <!-- 多文件选择 -->
+                        <div class="mb-4">
+                            <label class="form-label">选择多个文件</label>
+                            <div class="flex flex-col gap-2">
+                                <input type="file" id="selectFilesInput" class="hidden" multiple accept="*">
+                                <button id="selectFilesBtn" class="btn btn-secondary">
+                                    <i class="fa fa-files-o text-sm btn-icon"></i>选择多个文件
+                                </button>
+                                <p class="text-xs text-gray-500 text-center">支持同时选择多个文件（Ctrl/Shift+点击）</p>
+                            </div>
+                        </div>
+                        
+                        <div id="selectedSources" class="hidden">
+                            <h4 class="font-medium mb-2">已选择的来源：</h4>
+                            <ul id="sourceList" class="text-sm max-h-32 overflow-y-auto scrollbar-thin"></ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Excel导入和行列设置 -->
+                    <div class="mb-6 border-t pt-6">
+                        <h3 class="text-lg font-medium mb-3">Excel设置</h3>
+                        
+                        <!-- 导入现有Excel -->
+                        <div class="mb-4">
+                            <label class="form-label">导入现有Excel文件（可选）</label>
+                            <div id="excelUploadArea" class="excel-upload-area">
+                                <i class="fa fa-file-excel-o text-3xl text-gray-400 mb-2"></i>
+                                <p class="mb-2 text-sm">拖拽Excel文件到此处或点击选择</p>
+                                <input type="file" id="excelFileInput" class="hidden" accept=".xlsx,.xls">
+                                <button id="selectExcelBtn" class="btn btn-secondary text-sm">
+                                    <i class="fa fa-upload text-sm btn-icon"></i>选择Excel文件
+                                </button>
+                            </div>
+                            <div id="excelFileInfo" class="hidden mt-2 text-sm text-gray-600">
+                                <span id="excelFileName">未选择文件</span>
+                                <button id="removeExcelBtn" class="ml-2 text-red-500 hover:text-red-700">
+                                    <i class="fa fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 行列设置 -->
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="form-group">
+                                <label class="form-label" for="startRow">开始行号</label>
+                                <input type="number" id="startRow" class="form-control" value="1" min="1">
+                                <p class="text-xs text-gray-500 mt-1">从第几行开始插入（默认1）</p>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="startCol">开始列号</label>
+                                <input type="number" id="startCol" class="form-control" value="1" min="1">
+                                <p class="text-xs text-gray-500 mt-1">从第几列开始插入（默认1）</p>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="insertMode">插入模式</label>
+                            <select id="insertMode" class="form-control">
+                                <option value="overwrite">覆盖现有内容</option>
+                                <option value="append">追加到现有内容后</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 操作按钮 -->
+                    <div class="flex flex-col gap-2">
+                        <button id="batchDeleteBtn" class="btn btn-danger w-full disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fa fa-trash text-sm btn-icon"></i>批量删除选中文件
+                        </button>
+                        <button id="exportExcelBtn" class="btn btn-success w-full disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fa fa-file-excel-o text-sm btn-icon"></i>导出Excel
+                        </button>
+                        <button id="clearAllBtn" class="btn btn-secondary w-full">
+                            <i class="fa fa-trash-o text-sm btn-icon"></i>清空所有文件
+                        </button>
+                    </div>
+                    
+                    <!-- 拖拽提示 -->
+                    <div class="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                        <i class="fa fa-info-circle mr-1"></i>
+                        <span>提示：文件列表支持拖拽排序，拖动文件行前的图标即可调整顺序</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧文件列表 -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold flex items-center">
+                            <i class="fa fa-file-text-o text-primary mr-2"></i>文件列表
+                            <span class="ml-2 text-sm text-gray-500">(支持拖拽排序)</span>
+                        </h2>
+                        <div class="flex items-center gap-2">
+                            <div class="flex items-center">
+                                <span id="selectedCount" class="badge badge-primary mr-2">已选 0 个</span>
+                                <label class="checkbox-wrapper mr-2">
+                                    <input type="checkbox" id="selectAllCheckbox">
+                                    <label for="selectAllCheckbox"></label>
+                                </label>
+                                <span class="text-sm">全选</span>
+                            </div>
+                            <span id="totalCount" class="badge badge-primary">共 0 个文件</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 状态消息 -->
+                    <div id="statusMessage" class="hidden mb-4"></div>
+                    
+                    <!-- 进度条 -->
+                    <div id="progressContainer" class="hidden mb-4">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>处理进度</span>
+                            <span id="progressText">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="progressBarFill" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 文件列表表格 -->
+                    <div class="table-container border rounded-lg">
+                        <table id="fileTable">
+                            <thead>
+                                <tr>
+                                    <th class="w-12"></th> <!-- 拖拽手柄列 -->
+                                    <th class="w-12">
+                                        <label class="checkbox-wrapper mx-auto">
+                                            <input type="checkbox" id="tableSelectAll">
+                                            <label for="tableSelectAll"></label>
+                                        </label>
+                                    </th>
+                                    <th class="cursor-pointer hover:bg-gray-100" data-sort="name">
+                                        <div class="flex items-center">
+                                            文件名
+                                            <i class="fa fa-sort ml-1 text-gray-400"></i>
+                                        </div>
+                                    </th>
+                                    <th class="cursor-pointer hover:bg-gray-100" data-sort="path">
+                                        <div class="flex items-center">
+                                            路径/来源
+                                            <i class="fa fa-sort ml-1 text-gray-400"></i>
+                                        </div>
+                                    </th>
+                                    <th class="w-12 text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fileTableBody" class="sortable-container">
+                                <tr>
+                                    <td colspan="5" class="text-center py-8 text-gray-500">请选择文件或文件夹以显示列表</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- 底部信息 -->
+        <footer class="mt-8 text-center text-gray-500 text-sm">
+            <p>© 2025 文件名导入Excel工具 | 支持多文件选择、批量删除、拖拽排序、指定行列插入</p>
+        </footer>
+    </div>
+
+    <script>
+        // 全局变量
+        let fileData = []; // 存储所有文件数据（包含唯一ID）
+        let selectedSources = []; // 存储已选择的来源（文件夹/文件组）
+        let isProcessing = false; // 是否正在处理文件
+        let excelFile = null; // 导入的Excel文件
+        let excelWorkbook = null; // Excel工作簿对象
+        let nextFileId = 1; // 文件唯一ID计数器
+        let sortable = null; // SortableJS实例
+        
+        // DOM元素
+        const selectFolderBtn = document.getElementById('selectFolderBtn');
+        const selectFilesBtn = document.getElementById('selectFilesBtn');
+        const selectFilesInput = document.getElementById('selectFilesInput');
+        const selectedSourcesContainer = document.getElementById('selectedSources');
+        const sourceList = document.getElementById('sourceList');
+        const fileTableBody = document.getElementById('fileTableBody');
+        const totalCount = document.getElementById('totalCount');
+        const selectedCount = document.getElementById('selectedCount');
+        const exportExcelBtn = document.getElementById('exportExcelBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const progressText = document.getElementById('progressText');
+        const tableHeaders = document.querySelectorAll('th[data-sort]');
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        const tableSelectAll = document.getElementById('tableSelectAll');
+        
+        // Excel相关元素
+        const excelUploadArea = document.getElementById('excelUploadArea');
+        const excelFileInput = document.getElementById('excelFileInput');
+        const selectExcelBtn = document.getElementById('selectExcelBtn');
+        const excelFileInfo = document.getElementById('excelFileInfo');
+        const excelFileName = document.getElementById('excelFileName');
+        const removeExcelBtn = document.getElementById('removeExcelBtn');
+        const startRowInput = document.getElementById('startRow');
+        const startColInput = document.getElementById('startCol');
+        const insertModeSelect = document.getElementById('insertMode');
+        
+        // 初始化
+        function init() {
+            // 绑定事件
+            selectFolderBtn.addEventListener('click', selectFolder);
+            selectFilesBtn.addEventListener('click', () => selectFilesInput.click());
+            selectFilesInput.addEventListener('change', handleFileSelection);
+            exportExcelBtn.addEventListener('click', exportToExcel);
+            clearAllBtn.addEventListener('click', clearAllFiles);
+            batchDeleteBtn.addEventListener('click', batchDeleteSelected);
+            
+            // 全选复选框事件
+            selectAllCheckbox.addEventListener('change', toggleSelectAll);
+            tableSelectAll.addEventListener('change', toggleSelectAll);
+            
+            // Excel相关事件
+            selectExcelBtn.addEventListener('click', () => excelFileInput.click());
+            excelFileInput.addEventListener('change', handleExcelUpload);
+            removeExcelBtn.addEventListener('click', removeExcelFile);
+            excelUploadArea.addEventListener('dragover', handleExcelDragOver);
+            excelUploadArea.addEventListener('drop', handleExcelDrop);
+            
+            // 绑定表头排序事件
+            tableHeaders.forEach(header => {
+                header.addEventListener('click', () => {
+                    const sortField = header.dataset.sort;
+                    if (sortField) {
+                        sortTable(sortField);
+                    }
+                });
+            });
+            
+            // 初始化拖放区域（文件夹）
+            const folderDropArea = document.querySelector('.folder-drop-area');
+            folderDropArea.addEventListener('dragover', handleDragOver);
+            folderDropArea.addEventListener('drop', handleDrop);
+            
+            // 初始化拖拽排序
+            initSortable();
+            
+            // 显示提示信息
+            showStatusMessage('info', '请选择文件或文件夹，支持拖拽排序、批量操作和指定行列插入Excel');
+        }
+        
+        // 初始化拖拽排序功能
+        function initSortable() {
+            // 销毁现有实例（如果存在）
+            if (sortable) {
+                sortable.destroy();
+            }
+            
+            // 只有当有文件时才初始化排序
+            if (fileData.length > 0) {
+                sortable = new Sortable(fileTableBody, {
+                    handle: '.drag-handle', // 拖拽手柄
+                    animation: 150, // 动画时长
+                    ghostClass: 'sortable-ghost', // 拖拽时的占位符样式
+                    chosenClass: 'sortable-chosen', // 选中拖拽元素时的样式
+                    dragClass: 'sortable-drag', // 拖拽过程中的样式
+                    placeholder: 'drag-placeholder', // 占位符
+                    
+                    // 开始拖拽时触发
+                    onStart: function() {
+                        showStatusMessage('info', '拖动文件调整顺序，释放鼠标完成排序');
+                    },
+                    
+                    // 排序结束时触发
+                    onEnd: function(evt) {
+                        const oldIndex = evt.oldIndex;
+                        const newIndex = evt.newIndex;
+                        
+                        // 调整文件数据顺序
+                        if (oldIndex !== newIndex) {
+                            // 从原始位置移除文件
+                            const [movedFile] = fileData.splice(oldIndex, 1);
+                            // 插入到新位置
+                            fileData.splice(newIndex, 0, movedFile);
+                            
+                            // 更新文件列表UI（保持选中状态）
+                            updateFileList(true);
+                            
+                            showStatusMessage('success', '文件顺序调整成功');
+                        }
+                    },
+                    
+                    // 只有当有文件时才启用拖拽
+                    disabled: fileData.length === 0
+                });
+            }
+        }
+        
+        // 选择文件夹
+        async function selectFolder() {
+            try {
+                // 检查浏览器是否支持File System Access API
+                if (!window.showDirectoryPicker) {
+                    showStatusMessage('error', '您的浏览器不支持文件夹选择功能，请使用Chrome、Edge或Opera浏览器');
+                    return;
+                }
+                
+                // 显示文件夹选择器
+                const dirHandle = await window.showDirectoryPicker({
+                    mode: 'read',
+                    startIn: 'desktop'
+                });
+                
+                // 处理选择的文件夹
+                await processFolder(dirHandle);
+            } catch (error) {
+                // 用户取消选择时也会抛出错误，这里忽略
+                if (error.name !== 'AbortError') {
+                    console.error('选择文件夹时出错:', error);
+                    showStatusMessage('error', '选择文件夹时出错: ' + error.message);
+                }
+            }
+        }
+        
+        // 处理拖放事件（文件夹）
+        function handleDragOver(e) {
+            e.preventDefault();
+            const dropArea = e.currentTarget;
+            dropArea.classList.add('active');
+        }
+        
+        // 处理拖放文件/文件夹
+        async function handleDrop(e) {
+            e.preventDefault();
+            const dropArea = e.currentTarget;
+            dropArea.classList.remove('active');
+            
+            try {
+                // 检查是否有拖放的项目
+                if (!e.dataTransfer.items) {
+                    showStatusMessage('error', '无法获取拖放的项目');
+                    return;
+                }
+                
+                // 处理每个拖放的项目
+                for (const item of e.dataTransfer.items) {
+                    if (item.kind === 'file') {
+                        // 检查是否支持文件系统句柄
+                        if (item.getAsFileSystemHandle) {
+                            const handle = await item.getAsFileSystemHandle();
+                            if (handle.kind === 'directory') {
+                                await processFolder(handle);
+                            } else {
+                                // 单个文件拖放
+                                const file = await handle.getFile();
+                                processSingleFile(file);
+                            }
+                        } else {
+                            // 降级处理：直接获取文件
+                            const file = e.dataTransfer.files[0];
+                            processSingleFile(file);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('处理拖放时出错:', error);
+                showStatusMessage('error', '处理拖放时出错: ' + error.message);
+            }
+        }
+        
+        // 处理多文件选择
+        function handleFileSelection(e) {
+            const files = e.target.files;
+            if (files.length === 0) return;
+            
+            // 创建一个文件组来源
+            const sourceId = `files_${Date.now()}`;
+            const sourceName = `选中的 ${files.length} 个文件`;
+            
+            // 添加到来源列表
+            selectedSources.push({
+                id: sourceId,
+                name: sourceName,
+                type: 'files',
+                count: files.length
+            });
+            
+            // 更新来源列表UI
+            updateSourceList();
+            
+            // 处理每个文件
+            const newFiles = [];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileObj = {
+                    id: `file_${nextFileId++}`,
+                    name: file.name,
+                    path: file.name, // 对于直接选择的文件，路径就是文件名
+                    sourceId: sourceId,
+                    isSelected: false
+                };
+                newFiles.push(fileObj);
+            }
+            
+            // 添加到文件数据
+            fileData = [...fileData, ...newFiles];
+            
+            // 更新文件列表UI
+            updateFileList();
+            
+            // 重新初始化拖拽排序
+            initSortable();
+            
+            // 启用相关按钮
+            updateButtonStates();
+            
+            // 显示成功消息
+            showStatusMessage('success', `成功添加 ${files.length} 个文件`);
+            
+            // 重置文件输入
+            selectFilesInput.value = '';
+        }
+        
+        // 处理文件夹
+        async function processFolder(dirHandle) {
+            try {
+                // 创建来源ID
+                const sourceId = `folder_${Date.now()}`;
+                const sourceName = dirHandle.name;
+                
+                // 检查是否已经处理过这个文件夹
+                if (selectedSources.some(source => source.type === 'folder' && source.name === sourceName)) {
+                    showStatusMessage('warning', `文件夹 "${sourceName}" 已经处理过了`);
+                    return;
+                }
+                
+                // 添加到来源列表
+                selectedSources.push({
+                    id: sourceId,
+                    name: sourceName,
+                    type: 'folder',
+                    count: 0 // 后续会更新
+                });
+                
+                // 更新来源列表UI
+                updateSourceList();
+                
+                // 显示进度条
+                progressContainer.classList.remove('hidden');
+                progressBarFill.style.width = '0%';
+                progressText.textContent = '0%';
+                
+                // 递归读取文件夹中的所有文件
+                isProcessing = true;
+                const folderFiles = [];
+                await readFolderRecursive(dirHandle, '', folderFiles, sourceId);
+                isProcessing = false;
+                
+                // 隐藏进度条
+                progressContainer.classList.add('hidden');
+                
+                // 更新来源文件计数
+                const sourceIndex = selectedSources.findIndex(s => s.id === sourceId);
+                if (sourceIndex !== -1) {
+                    selectedSources[sourceIndex].count = folderFiles.length;
+                    updateSourceList();
+                }
+                
+                // 添加文件数据
+                fileData = [...fileData, ...folderFiles];
+                
+                // 更新文件列表UI
+                updateFileList();
+                
+                // 重新初始化拖拽排序
+                initSortable();
+                
+                // 启用相关按钮
+                updateButtonStates();
+                
+                // 显示成功消息
+                showStatusMessage('success', `成功读取文件夹 "${sourceName}"，找到 ${folderFiles.length} 个文件`);
+            } catch (error) {
+                console.error('处理文件夹时出错:', error);
+                showStatusMessage('error', '处理文件夹时出错: ' + error.message);
+            }
+        }
+        
+        // 递归读取文件夹
+        async function readFolderRecursive(dirHandle, relativePath, fileList, sourceId) {
+            const entries = dirHandle.entries();
+            let processedCount = 0;
+            let totalCount = 0;
+            
+            // 先计算总文件数
+            for await (const _ of dirHandle.values()) {
+                totalCount++;
+            }
+            
+            // 重新获取entries
+            const entries2 = dirHandle.entries();
+            
+            for await (const [name, handle] of entries2) {
+                processedCount++;
+                
+                // 更新进度条
+                const progress = Math.round((processedCount / totalCount) * 100);
+                progressBarFill.style.width = `${progress}%`;
+                progressText.textContent = `${progress}%`;
+                
+                const currentPath = relativePath ? `${relativePath}/${name}` : name;
+                
+                if (handle.kind === 'file') {
+                    // 是文件，添加到列表
+                    fileList.push({
+                        id: `file_${nextFileId++}`,
+                        name: name,
+                        path: currentPath,
+                        sourceId: sourceId,
+                        isSelected: false
+                    });
+                } else if (handle.kind === 'directory') {
+                    // 是文件夹，递归处理
+                    await readFolderRecursive(handle, currentPath, fileList, sourceId);
+                }
+                
+                // 让出主线程，避免UI阻塞
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        }
+        
+        // 处理单个文件（拖放或直接选择）
+        function processSingleFile(file) {
+            // 检查文件是否已存在
+            const isDuplicate = fileData.some(f => f.name === file.name && f.path === file.name);
+            if (isDuplicate) {
+                showStatusMessage('warning', `文件 "${file.name}" 已经存在于列表中`);
+                return;
+            }
+            
+            // 检查是否有对应的文件组来源
+            let source = selectedSources.find(s => s.type === 'files' && s.name.includes('单个文件'));
+            if (!source) {
+                // 创建单个文件来源组
+                const sourceId = `files_${Date.now()}`;
+                source = {
+                    id: sourceId,
+                    name: '单个文件集合',
+                    type: 'files',
+                    count: 0
+                };
+                selectedSources.push(source);
+                updateSourceList();
+            }
+            
+            // 创建文件对象
+            const fileObj = {
+                id: `file_${nextFileId++}`,
+                name: file.name,
+                path: file.name,
+                sourceId: source.id,
+                isSelected: false
+            };
+            
+            // 添加到文件数据
+            fileData.push(fileObj);
+            
+            // 更新来源计数
+            source.count++;
+            updateSourceList();
+            
+            // 更新文件列表UI
+            updateFileList();
+            
+            // 重新初始化拖拽排序
+            initSortable();
+            
+            // 启用相关按钮
+            updateButtonStates();
+            
+            // 显示成功消息
+            showStatusMessage('success', `成功添加文件: ${file.name}`);
+        }
+        
+        // 更新来源列表UI
+        function updateSourceList() {
+            if (selectedSources.length === 0) {
+                selectedSourcesContainer.classList.add('hidden');
+                return;
+            }
+            
+            selectedSourcesContainer.classList.remove('hidden');
+            sourceList.innerHTML = '';
+            
+            selectedSources.forEach((source, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center py-1 border-b border-gray-100';
+                li.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fa fa-${source.type === 'folder' ? 'folder' : 'file-text-o'} mr-2 text-gray-500"></i>
+                        <span>${source.name} (${source.count} 个文件)</span>
+                    </div>
+                    <button class="text-red-500 hover:text-red-700" data-id="${source.id}">
+                        <i class="fa fa-times"></i>
+                    </button>
+                `;
+                sourceList.appendChild(li);
+                
+                // 绑定删除按钮事件
+                const deleteBtn = li.querySelector('button');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const sourceId = deleteBtn.dataset.id;
+                    removeSource(sourceId);
+                });
+            });
+        }
+        
+        // 移除来源（及相关文件）
+        function removeSource(sourceId) {
+            // 找到要移除的来源
+            const sourceIndex = selectedSources.findIndex(s => s.id === sourceId);
+            if (sourceIndex === -1) return;
+            
+            const source = selectedSources[sourceIndex];
+            const sourceName = source.name;
+            const fileCount = source.count;
+            
+            // 移除来源
+            selectedSources.splice(sourceIndex, 1);
+            
+            // 移除相关文件
+            fileData = fileData.filter(file => file.sourceId !== sourceId);
+            
+            // 更新UI
+            updateSourceList();
+            updateFileList();
+            
+            // 重新初始化拖拽排序（可能需要销毁）
+            initSortable();
+            
+            updateButtonStates();
+            
+            // 显示消息
+            showStatusMessage('info', `已移除来源 "${sourceName}" 及其中的 ${fileCount} 个文件`);
+        }
+        
+        // 更新文件列表UI
+        function updateFileList(keepSelection = false) {
+            if (fileData.length === 0) {
+                fileTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center py-8 text-gray-500">没有找到文件</td>
+                    </tr>
+                `;
+                totalCount.textContent = '共 0 个文件';
+                selectedCount.textContent = '已选 0 个';
+                return;
+            }
+            
+            // 更新文件计数
+            totalCount.textContent = `共 ${fileData.length} 个文件`;
+            
+            // 计算选中文件数
+            const selectedFileCount = fileData.filter(file => file.isSelected).length;
+            selectedCount.textContent = `已选 ${selectedFileCount} 个`;
+            
+            // 更新全选复选框状态
+            const allSelected = fileData.length > 0 && selectedFileCount === fileData.length;
+            selectAllCheckbox.checked = allSelected;
+            tableSelectAll.checked = allSelected;
+            
+            // 清空表格
+            fileTableBody.innerHTML = '';
+            
+            // 添加文件行
+            fileData.forEach(file => {
+                const tr = document.createElement('tr');
+                if (file.isSelected) {
+                    tr.classList.add('selected-row');
+                }
+                
+                tr.innerHTML = `
+                    <td class="text-center">
+                        <i class="fa fa-bars drag-handle text-gray-400 hover:text-primary" title="拖拽调整顺序"></i>
+                    </td>
+                    <td>
+                        <label class="checkbox-wrapper mx-auto">
+                            <input type="checkbox" data-id="${file.id}" ${file.isSelected ? 'checked' : ''}>
+                            <label for="checkbox-${file.id}"></label>
+                        </label>
+                    </td>
+                    <td>${file.name}</td>
+                    <td class="text-gray-600">${file.path}</td>
+                    <td class="text-center">
+                        <button class="text-red-500 hover:text-red-700 delete-single" data-id="${file.id}">
+                            <i class="fa fa-trash-o"></i>
+                        </button>
+                    </td>
+                `;
+                fileTableBody.appendChild(tr);
+                
+                // 绑定复选框事件
+                const checkbox = tr.querySelector('input[type="checkbox"]');
+                checkbox.id = `checkbox-${file.id}`;
+                checkbox.addEventListener('change', (e) => {
+                    const fileId = e.target.dataset.id;
+                    toggleFileSelection(fileId, e.target.checked);
+                });
+                
+                // 绑定单个删除按钮事件
+                const deleteBtn = tr.querySelector('.delete-single');
+                deleteBtn.addEventListener('click', () => {
+                    deleteSingleFile(file.id);
+                });
+            });
+            
+            // 如果是排序后更新，保持拖拽排序功能
+            if (keepSelection && sortable) {
+                initSortable();
+            }
+        }
+        
+        // 切换文件选中状态
+        function toggleFileSelection(fileId, isSelected) {
+            const fileIndex = fileData.findIndex(file => file.id === fileId);
+            if (fileIndex !== -1) {
+                fileData[fileIndex].isSelected = isSelected;
+                
+                // 更新行样式
+                const row = document.querySelector(`input[data-id="${fileId}"]`).closest('tr');
+                if (isSelected) {
+                    row.classList.add('selected-row');
+                } else {
+                    row.classList.remove('selected-row');
+                }
+                
+                // 更新选中计数
+                const selectedFileCount = fileData.filter(file => file.isSelected).length;
+                selectedCount.textContent = `已选 ${selectedFileCount} 个`;
+                
+                // 更新批量删除按钮状态
+                batchDeleteBtn.disabled = selectedFileCount === 0;
+            }
+        }
+        
+        // 全选/取消全选
+        function toggleSelectAll(e) {
+            const isChecked = e.target.checked;
+            
+            // 更新所有文件的选中状态
+            fileData.forEach(file => {
+                file.isSelected = isChecked;
+            });
+            
+            // 更新UI
+            updateFileList();
+            
+            // 更新批量删除按钮状态
+            batchDeleteBtn.disabled = !isChecked || fileData.length === 0;
+        }
+        
+        // 单个文件删除
+        function deleteSingleFile(fileId) {
+            // 找到文件索引
+            const fileIndex = fileData.findIndex(file => file.id === fileId);
+            if (fileIndex === -1) return;
+            
+            const fileName = fileData[fileIndex].name;
+            const sourceId = fileData[fileIndex].sourceId;
+            
+            // 移除文件
+            fileData.splice(fileIndex, 1);
+            
+            // 更新对应来源的文件计数
+            const sourceIndex = selectedSources.findIndex(s => s.id === sourceId);
+            if (sourceIndex !== -1) {
+                selectedSources[sourceIndex].count--;
+                
+                // 如果来源的文件数为0，移除该来源
+                if (selectedSources[sourceIndex].count === 0) {
+                    selectedSources.splice(sourceIndex, 1);
+                }
+            }
+            
+            // 更新UI
+            updateSourceList();
+            updateFileList();
+            
+            // 重新初始化拖拽排序
+            initSortable();
+            
+            updateButtonStates();
+            
+            // 显示消息
+            showStatusMessage('info', `已删除文件: ${fileName}`);
+        }
+        
+        // 批量删除选中文件
+        function batchDeleteSelected() {
+            const selectedFiles = fileData.filter(file => file.isSelected);
+            if (selectedFiles.length === 0) {
+                showStatusMessage('warning', '没有选中要删除的文件');
+                return;
+            }
+            
+            if (!confirm(`确定要删除选中的 ${selectedFiles.length} 个文件吗？`)) {
+                return;
+            }
+            
+            // 按来源分组统计
+            const sourceCounts = {};
+            selectedFiles.forEach(file => {
+                if (!sourceCounts[file.sourceId]) {
+                    sourceCounts[file.sourceId] = 0;
+                }
+                sourceCounts[file.sourceId]++;
+            });
+            
+            // 移除选中文件
+            fileData = fileData.filter(file => !file.isSelected);
+            
+            // 更新来源计数，移除空来源
+            selectedSources = selectedSources.filter(source => {
+                if (sourceCounts[source.id]) {
+                    source.count -= sourceCounts[source.id];
+                    return source.count > 0; // 只保留还有文件的来源
+                }
+                return true;
+            });
+            
+            // 更新UI
+            updateSourceList();
+            updateFileList();
+            
+            // 重新初始化拖拽排序
+            initSortable();
+            
+            updateButtonStates();
+            
+            // 显示消息
+            showStatusMessage('success', `已成功删除 ${selectedFiles.length} 个选中文件`);
+        }
+        
+        // 清空所有文件
+        function clearAllFiles() {
+            if (fileData.length === 0) {
+                showStatusMessage('warning', '文件列表已经是空的');
+                return;
+            }
+            
+            if (!confirm(`确定要清空所有 ${fileData.length} 个文件吗？`)) {
+                return;
+            }
+            
+            // 清空所有数据
+            fileData = [];
+            selectedSources = [];
+            nextFileId = 1;
+            
+            // 更新UI
+            updateSourceList();
+            updateFileList();
+            
+            // 销毁拖拽排序实例
+            if (sortable) {
+                sortable.destroy();
+                sortable = null;
+            }
+            
+            updateButtonStates();
+            
+            // 显示消息
+            showStatusMessage('info', '已清空所有文件');
+        }
+        
+        // 排序表格
+        function sortTable(field) {
+            // 检查当前排序状态
+            const header = document.querySelector(`th[data-sort="${field}"]`);
+            const currentSort = header.getAttribute('data-sort-direction') || 'asc';
+            
+            // 更新排序方向
+            const newSort = currentSort === 'asc' ? 'desc' : 'asc';
+            header.setAttribute('data-sort-direction', newSort);
+            
+            // 更新排序图标
+            tableHeaders.forEach(h => {
+                const icon = h.querySelector('i');
+                if (h.dataset.sort === field) {
+                    icon.className = newSort === 'asc' ? 'fa fa-sort-asc ml-1' : 'fa fa-sort-desc ml-1';
+                } else if (h.querySelector('i')) {
+                    h.querySelector('i').className = 'fa fa-sort ml-1 text-gray-400';
+                }
+            });
+            
+            // 排序数据
+            fileData.sort((a, b) => {
+                if (newSort === 'asc') {
+                    return a[field].localeCompare(b[field], undefined, { sensitivity: 'base' });
+                } else {
+                    return b[field].localeCompare(a[field], undefined, { sensitivity: 'base' });
+                }
+            });
+            
+            // 更新文件列表
+            updateFileList();
+            
+            // 重新初始化拖拽排序
+            initSortable();
+            
+            // 显示消息
+            showStatusMessage('success', `已按${field === 'name' ? '文件名' : '路径'}${newSort === 'asc' ? '升序' : '降序'}排序`);
+        }
+        
+        // 处理Excel文件上传
+        function handleExcelUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processExcelFile(file);
+            }
+        }
+        
+        // 处理Excel拖放
+        function handleExcelDragOver(e) {
+            e.preventDefault();
+            excelUploadArea.classList.add('active');
+        }
+        
+        function handleExcelDrop(e) {
+            e.preventDefault();
+            excelUploadArea.classList.remove('active');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+                processExcelFile(file);
+            } else {
+                showStatusMessage('error', '请上传有效的Excel文件（.xlsx或.xls格式）');
+            }
+        }
+        
+        // 处理Excel文件
+        function processExcelFile(file) {
+            try {
+                excelFile = file;
+                excelFileName.textContent = file.name;
+                excelFileInfo.classList.remove('hidden');
+                
+                // 读取Excel文件
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        excelWorkbook = XLSX.read(data, { type: 'array' });
+                        showStatusMessage('success', `成功导入Excel文件：${file.name}`);
+                    } catch (error) {
+                        console.error('读取Excel文件失败:', error);
+                        showStatusMessage('error', '读取Excel文件失败: ' + error.message);
+                        removeExcelFile();
+                    }
+                };
+                reader.onerror = function() {
+                    showStatusMessage('error', '读取Excel文件时发生错误');
+                    removeExcelFile();
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (error) {
+                console.error('处理Excel文件失败:', error);
+                showStatusMessage('error', '处理Excel文件失败: ' + error.message);
+            }
+        }
+        
+        // 移除Excel文件
+        function removeExcelFile() {
+            excelFile = null;
+            excelWorkbook = null;
+            excelFileInput.value = '';
+            excelFileInfo.classList.add('hidden');
+            showStatusMessage('info', '已移除导入的Excel文件');
+        }
+        
+        // 导出为Excel（支持指定行列插入）
+        function exportToExcel() {
+            if (fileData.length === 0) {
+                showStatusMessage('warning', '没有文件可导出');
+                return;
+            }
+            
+            try {
+                const startRow = parseInt(startRowInput.value) || 1;
+                const startCol = parseInt(startColInput.value) || 1;
+                const insertMode = insertModeSelect.value;
+                
+                // 准备要插入的文件名数据（按当前顺序）
+                const fileNames = fileData.map(file => file.name);
+                
+                let wb, ws;
+                
+                if (excelWorkbook) {
+                    // 如果有导入的Excel文件，使用现有工作簿
+                    wb = excelWorkbook;
+                    // 获取第一个工作表
+                    const sheetName = wb.SheetNames[0];
+                    ws = wb.Sheets[sheetName];
+                    
+                    // 将Excel行列转换为A1格式（如第1行第1列 = A1）
+                    const startCell = XLSX.utils.encode_cell({
+                        r: startRow - 1, // 转换为0-based索引
+                        c: startCol - 1
+                    });
+                    
+                    if (insertMode === 'overwrite') {
+                        // 覆盖模式：直接写入指定位置
+                        for (let i = 0; i < fileNames.length; i++) {
+                            const cell = XLSX.utils.encode_cell({
+                                r: startRow - 1 + i,
+                                c: startCol - 1
+                            });
+                            ws[cell] = { t: 's', v: fileNames[i] }; // t:'s' 表示字符串类型
+                        }
+                    } else {
+                        // 追加模式：找到指定列的最后一个非空单元格，在后面追加
+                        let lastRow = startRow - 1;
+                        
+                        // 查找指定列的最后一个非空单元格
+                        while (true) {
+                            const cell = XLSX.utils.encode_cell({
+                                r: lastRow,
+                                c: startCol - 1
+                            });
+                            if (!ws[cell]) break;
+                            lastRow++;
+                        }
+                        
+                        // 从最后一行后面开始追加
+                        for (let i = 0; i < fileNames.length; i++) {
+                            const cell = XLSX.utils.encode_cell({
+                                r: lastRow + i,
+                                c: startCol - 1
+                            });
+                            ws[cell] = { t: 's', v: fileNames[i] };
+                        }
+                    }
+                    
+                    // 调整工作表范围
+                    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+                    const newRange = {
+                        s: { r: 0, c: 0 },
+                        e: {
+                            r: Math.max(range.e.r, startRow - 1 + fileNames.length - 1),
+                            c: Math.max(range.e.c, startCol - 1)
+                        }
+                    };
+                    ws['!ref'] = XLSX.utils.encode_range(newRange);
+                } else {
+                    // 如果没有导入Excel文件，创建新的工作簿
+                    wb = XLSX.utils.book_new();
+                    
+                    // 创建新工作表
+                    const data = [];
+                    
+                    // 填充空行到开始行
+                    for (let i = 0; i < startRow - 1; i++) {
+                        data.push([]);
+                    }
+                    
+                    // 在指定位置插入文件名（按当前顺序）
+                    fileNames.forEach((fileName, i) => {
+                        const row = [];
+                        // 填充空列到开始列
+                        for (let j = 0; j < startCol - 1; j++) {
+                            row.push('');
+                        }
+                        row.push(fileName);
+                        data.push(row);
+                    });
+                    
+                    ws = XLSX.utils.aoa_to_sheet(data);
+                    XLSX.utils.book_append_sheet(wb, ws, '文件名列表');
+                }
+                
+                // 导出Excel文件
+                const excelFileName = excelFile ? `修改后的_${excelFile.name}` : '文件名列表.xlsx';
+                XLSX.writeFile(wb, excelFileName);
+                
+                // 显示成功消息
+                showStatusMessage('success', `成功导出 ${fileData.length} 个文件名到Excel，插入位置：第${startRow}行第${startCol}列`);
+            } catch (error) {
+                console.error('导出Excel时出错:', error);
+                showStatusMessage('error', '导出Excel时出错: ' + error.message);
+            }
+        }
+        
+        // 更新按钮状态
+        function updateButtonStates() {
+            const hasFiles = fileData.length > 0;
+            const hasSelectedFiles = fileData.some(file => file.isSelected);
+            
+            exportExcelBtn.disabled = !hasFiles;
+            batchDeleteBtn.disabled = !hasSelectedFiles;
+            clearAllBtn.disabled = !hasFiles;
+            
+            // 更新拖拽排序的启用状态
+            if (sortable) {
+                sortable.option('disabled', !hasFiles);
+            }
+        }
+        
+        // 显示状态消息
+        function showStatusMessage(type, message) {
+            statusMessage.className = `alert alert-${type}`;
+            statusMessage.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fa fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            statusMessage.classList.remove('hidden');
+            
+            // 3秒后自动隐藏信息和成功消息
+            if (type === 'info' || type === 'success') {
+                setTimeout(() => {
+                    statusMessage.classList.add('hidden');
+                }, 3000);
+            }
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
