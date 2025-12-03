@@ -1,0 +1,3 @@
+English Word Learning Suite.py  英语单词学习主要软件
+word_processor_nogui.py 英语单词文件整理工具无GUI版
+word_processor_gui.py 英语单词文件整理工具GUI版
